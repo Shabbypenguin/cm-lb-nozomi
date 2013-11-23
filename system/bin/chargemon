@@ -1,0 +1,226 @@
+#!/system/bin/sh
+#
+# @(#) chargemon for Xperia GX/SX/AX/VL/Z ver. 2.3.0 2013.06.01
+#
+# Description:
+#   A chargemon script that simple function with logging.
+#
+# Author:
+#   cray_Doze
+#
+###########################################################################
+
+# Constant definition
+LOGPATH="/cache/chargemon"
+LOGFILE="${LOGPATH}/chargemon.log"
+WORKDIR="${LOGPATH}"
+BTMGRPATH="/system/btmgr"
+
+# Environment variable definition
+PATH="/sbin:/system/xbin:/system/bin"; export PATH
+
+# Busybox setup
+if [ -x "${BTMGRPATH}/bin/busybox" ]; then
+  BUSYBOX="${BTMGRPATH}/bin/busybox"
+elif [ -x "/system/xbin/busybox" ]; then
+  BUSYBOX="/system/xbin/busybox"
+elif [ -x "/system/bin/busybox" ]; then
+  BUSYBOX="/system/bin/busybox"
+else
+  BUSYBOX=""
+fi
+
+# Command setup
+DATE="${BUSYBOX} date"
+MKDIR="${BUSYBOX} mkdir"
+CHOWN="${BUSYBOX} chown"
+CHMOD="${BUSYBOX} chmod"
+MV="${BUSYBOX} mv"
+TOUCH="${BUSYBOX} touch"
+CAT="${BUSYBOX} cat"
+SLEEP="${BUSYBOX} sleep"
+KILL="${BUSYBOX} kill"
+RM="${BUSYBOX} rm"
+PS="${BUSYBOX} ps"
+GREP="${BUSYBOX} grep"
+AWK="${BUSYBOX} awk"
+EXPR="${BUSYBOX} expr"
+MOUNT="${BUSYBOX} mount"
+UMOUNT="${BUSYBOX} umount"
+TAR="${BUSYBOX} tar"
+CHROOT="${BUSYBOX} chroot"
+LS="${BUSYBOX} ls"
+HEXDUMP="${BUSYBOX} hexdump"
+
+# Function definition for logging
+ECHOL(){
+  _DATETIME=`${DATE} +"%Y%m%d %H%M%S"`
+  echo "${_DATETIME}: $*" >> ${LOGFILE}
+  return 0
+}
+EXECL(){
+  _DATETIME=`${DATE} +"%Y%m%d %H%M%S"`
+  echo "${_DATETIME}: $*" >> ${LOGFILE}
+  $* 2>> ${LOGFILE}
+  _RET=$?
+  echo "${_DATETIME}: RET=${_RET}" >> ${LOGFILE}
+  return ${_RET}
+}
+
+# Logfile rotation
+if [ ! -d "${LOGPATH}" ];then
+  ${MKDIR} ${LOGPATH}
+  ${CHOWN} system.cache ${LOGPATH}
+  ${CHMOD} 770 ${LOGPATH}
+else
+  if [ -f ${LOGFILE} ];then
+    ${MV} ${LOGFILE} ${LOGFILE}.old
+  fi
+  ${TOUCH} ${LOGFILE}
+  ${CHMOD} 660 ${LOGFILE}
+fi
+
+# Start main routine
+ECHOL "### chargemon start..."
+ECHOL "### BUSYBOX=${BUSYBOX}"
+
+# Make work directory
+ECHOL "### check workdir..."
+if [ ! -d "${WORKDIR}" ];then
+  EXECL ${MKDIR} ${WORKDIR}
+  EXECL ${CHOWN} system.cache ${WORKDIR}
+  EXECL ${CHMOD} 770 ${WORKDIR}
+fi
+
+# Clear work directory
+if [ ! -e ${WORKDIR}/keycheck ];then
+  EXECL ${RM} ${WORKDIR}/keyevent*
+  EXECL ${RM} ${WORKDIR}/keycheck
+fi
+
+# LED setting
+LED_RED="$(${LS} /sys/class/leds/*red/brightness)"
+LED_BLUE="$(${LS} /sys/class/leds/*blue/brightness)"
+LED_GREEN="$(${LS} /sys/class/leds/*green/brightness)"
+
+# check recovery-boot file
+if [ ! -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
+  # keycheck for recovery-boot
+  ECHOL "### keycheck..."
+
+  # Turn on blue-led.
+  echo "0" > ${LED_RED}
+  echo "0" > ${LED_GREEN}
+  echo "255" > ${LED_BLUE}
+
+  # trigger vibration
+  echo '200' > /sys/class/timed_output/vibrator/enable
+
+  for EVENTDEV in $(${LS} /dev/input/event* )
+  do
+    SUFFIX="$(${EXPR} ${EVENTDEV} : '/dev/input/event\(.*\)')"
+    ${CAT} ${EVENTDEV} > ${WORKDIR}/keyevent${SUFFIX} &
+  done
+  ${SLEEP} 3
+
+  ${PS} > ${LOGPATH}/ps.log
+  ${CHMOD} 660 ${LOGPATH}/ps.log
+
+  for CATPROC in $(${PS} | ${GREP} /dev/input/event | ${GREP} -v grep | ${AWK} '{print $1}')
+  do
+    EXECL ${KILL} -9 ${CATPROC}
+  done
+
+  # Turn off blue-led.
+  echo "0" > ${LED_RED}
+  echo "0" > ${LED_GREEN}
+  echo "0" >  ${LED_BLUE}
+
+  ${HEXDUMP} ${WORKDIR}/keyevent* | ${GREP} -e '^.* 0001 .... .... ....$' > ${WORKDIR}/keycheck
+fi
+
+if [ -s ${WORKDIR}/keycheck -o -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
+  ECHOL "### recovery boot mode..."
+
+  EXECL ${RM} /cache/recovery/boot
+
+  # Recovery boot mode notification
+  echo "0" > ${LED_RED}
+  echo "255" > ${LED_GREEN}
+  echo "0" > ${LED_BLUE}
+  ${SLEEP} 1
+  echo "0" > ${LED_RED}
+  echo "0" > ${LED_GREEN}
+  echo "0" > ${LED_BLUE}
+
+  # Boot recovery
+  EXECL cd /
+  if [ -f /system/bin/recovery.tar ];then
+    ECHOL "### /system/bin/recovery.tar exist..."
+
+    # Initialize system clock.
+    ECHOL "### set timezone..."
+    EXECL export TZ="$(getprop persist.sys.timezone)"
+    ECHOL "### start time_daemon..."
+    /system/bin/time_daemon &
+    EXECL ${SLEEP} 5
+    ECHOL "### kill time_daemon..."
+    EXECL ${KILL} -9 $(${PS} | ${GREP} time_daemon | ${GREP} -v grep | ${AWK} -F' ' '{print $1}')
+
+    # Stop init services.
+    ECHOL "### stop init services..."
+    for SVCRUNNING in $(getprop | ${GREP} -E '^\[init\.svc\..*\]: \[running\]' | ${GREP} -v ueventd)
+    do
+      SVCNAME=$(${EXPR} ${SVCRUNNING} : '\[init\.svc\.\(.*\)\]:.*')
+      EXECL stop ${SVCNAME}
+    done
+    # Kill remaining processes under /system/bin
+    for RUNNINGPRC in $(${PS} | ${GREP} /system/bin | ${GREP} -v grep | ${GREP} -v chargemon | ${AWK} '{print $1}' )
+    do
+      EXECL ${KILL} -9 ${RUNNINGPRC}
+    done
+
+    # remount rootfs to rw.
+    ECHOL "### remount rootfs to rw..."
+    EXECL ${MOUNT} -o remount,rw rootfs /
+
+    # rm symlinks & files.
+    EXECL ${RM} sdcard etc tmp init* uevent* default*
+
+    # extract recovery.tar
+    EXECL ${RM} -r sbin
+    EXECL ${TAR} -xf /system/bin/recovery.tar
+
+    # setup tz.conf for init
+    ECHOL "### make tz.conf..."
+    EXECL echo on init > /tz.conf
+    EXECL echo export TZ "$(getprop persist.sys.timezone)" >> /tz.conf
+    EXECL ${CHMOD} 750 /tz.conf
+    EXECL tar cf /zoneinfo.tar /system/usr/share/zoneinfo
+
+    # Umount eMMCs
+    umount -l /dev/block/mmcblock0p10
+    umount -l /dev/block/mmcblock0p11
+    umount -l /dev/block/mmcblock0p12
+    umount -l /data
+
+    # Mount ramdisk
+    cd /
+    rm -r /sbin /sdcard
+    rm -f etc init* uevent* default*
+    tar -xf /system/bin/ramdisk.tar
+
+    # chroot
+    ECHOL "### chroot..."
+    ${CHROOT} / /init
+
+    # reboot when an error occurs in chroot
+    reboot
+  fi
+
+fi
+
+ECHOL "### normal boot mode..."
+
+# Continue booting
+exec /system/bin/charger
