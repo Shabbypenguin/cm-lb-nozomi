@@ -5,5 +5,6 @@ CyanogenMod 10 for the Xperia S by FXP (jerpelea) modified to work on locked dev
 
 Credits:
 - cray_Doze
+- artis112
 - DooMLorD
 - FreeXperia team
