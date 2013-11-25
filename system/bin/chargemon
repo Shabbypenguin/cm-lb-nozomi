@@ -1,15 +1,3 @@
-#!/system/bin/sh
-#
-# @(#) chargemon for Xperia GX/SX/AX/VL/Z ver. 2.3.0 2013.06.01
-#
-# Description:
-#   A chargemon script that simple function with logging.
-#
-# Author:
-#   cray_Doze
-#
-###########################################################################
-
 # Constant definition
 LOGPATH="/cache/chargemon"
 LOGFILE="${LOGPATH}/chargemon.log"
@@ -199,9 +187,9 @@ if [ -s ${WORKDIR}/keycheck -o -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
     EXECL tar cf /zoneinfo.tar /system/usr/share/zoneinfo
 
     # Umount eMMCs
-    umount -l /dev/block/mmcblock0p10
-    umount -l /dev/block/mmcblock0p11
     umount -l /dev/block/mmcblock0p12
+    umount -l /dev/block/mmcblock0p13
+    umount -l /dev/block/mmcblock0p14
     umount -l /data
 
     # Mount ramdisk
