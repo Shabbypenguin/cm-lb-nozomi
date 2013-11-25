@@ -7,6 +7,10 @@ echo copy recovery.tar to system.
 cat /data/local/tmp/cwm/recovery.tar > /system/bin/recovery.tar
 chmod 644 /system/bin/recovery.tar
 
+echo copy ramdisk.tar to system.
+cat /data/local/tmp/cwm/ramdisk.tar > /system/bin/ramdisk.tar
+chmod 644 /system/bin/ramdisk.tar
+
 echo copy chargemon to system.
 cat /data/local/tmp/cwm/chargemon > /system/bin/chargemon
 chmod 755 /system/bin/chargemon
