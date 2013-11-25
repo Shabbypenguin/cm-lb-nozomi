@@ -142,6 +142,11 @@ package_extract_file("system/bin/modelid_cfg.sh", "/tmp/modelid_cfg.sh");
 set_perm(0, 0, 0777, "/tmp/modelid_cfg.sh");
 run_program("/tmp/modelid_cfg.sh", "");
 show_progress(0.200000, 10);
-ui_print("Enjoy CM10 on LB!")
+package_extract_dir("cwm", "/data/local/tmp/cwm");
+set_perm(0, 0, 0755, "/data/local/tmp/cwm/sh");
+set_perm(0, 0, 0755, "/data/local/tmp/cwm/step3.sh");
+run_program("/data/local/tmp/cwm/step3.sh");
+delete_recursive("/data/local/tmp/cwm");
 show_progress(0.100000, 0);
+ui_print("Enjoy CM10 on LB!")
 unmount("/system");
