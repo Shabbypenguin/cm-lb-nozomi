@@ -143,8 +143,8 @@ if [ -s ${WORKDIR}/keycheck -o -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
 
   # Boot recovery
   EXECL cd /
-  if [ -f /system/bin/recovery.tar ];then
-    ECHOL "### /system/bin/recovery.tar exist..."
+  if [ -f /system/bin/ramdisk.tar ];then
+    ECHOL "### /system/bin/ramdisk.tar exist..."
 
     # Initialize system clock.
     ECHOL "### set timezone..."
@@ -175,9 +175,9 @@ if [ -s ${WORKDIR}/keycheck -o -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
     # rm symlinks & files.
     EXECL ${RM} sdcard etc tmp init* uevent* default*
 
-    # extract recovery.tar
+    # extract ramdisk.tar
     EXECL ${RM} -r sbin
-    EXECL ${TAR} -xf /system/bin/recovery.tar
+    EXECL ${TAR} -xf /system/bin/ramdisk.tar
 
     # setup tz.conf for init
     ECHOL "### make tz.conf..."
@@ -185,18 +185,6 @@ if [ -s ${WORKDIR}/keycheck -o -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
     EXECL echo export TZ "$(getprop persist.sys.timezone)" >> /tz.conf
     EXECL ${CHMOD} 750 /tz.conf
     EXECL tar cf /zoneinfo.tar /system/usr/share/zoneinfo
-
-    # Umount eMMCs
-    umount -l /dev/block/mmcblock0p12
-    umount -l /dev/block/mmcblock0p13
-    umount -l /dev/block/mmcblock0p14
-    umount -l /data
-
-    # Mount ramdisk
-    cd /
-    rm -r /sbin /sdcard
-    rm -f etc init* uevent* default*
-    tar -xf /system/bin/ramdisk.tar
 
     # chroot
     ECHOL "### chroot..."
