@@ -80,70 +80,9 @@ if [ ! -d "${WORKDIR}" ];then
   EXECL ${CHMOD} 770 ${WORKDIR}
 fi
 
-# Clear work directory
-if [ ! -e ${WORKDIR}/keycheck ];then
-  EXECL ${RM} ${WORKDIR}/keyevent*
-  EXECL ${RM} ${WORKDIR}/keycheck
-fi
-
-# LED setting
-LED_RED="$(${LS} /sys/class/leds/*red/brightness)"
-LED_BLUE="$(${LS} /sys/class/leds/*blue/brightness)"
-LED_GREEN="$(${LS} /sys/class/leds/*green/brightness)"
-
-# check recovery-boot file
-if [ ! -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
-  # keycheck for recovery-boot
-  ECHOL "### keycheck..."
-
-  # Turn on blue-led.
-  echo "0" > ${LED_RED}
-  echo "0" > ${LED_GREEN}
-  echo "255" > ${LED_BLUE}
-
-  # trigger vibration
-  echo '200' > /sys/class/timed_output/vibrator/enable
-
-  for EVENTDEV in $(${LS} /dev/input/event* )
-  do
-    SUFFIX="$(${EXPR} ${EVENTDEV} : '/dev/input/event\(.*\)')"
-    ${CAT} ${EVENTDEV} > ${WORKDIR}/keyevent${SUFFIX} &
-  done
-  ${SLEEP} 3
-
-  ${PS} > ${LOGPATH}/ps.log
-  ${CHMOD} 660 ${LOGPATH}/ps.log
-
-  for CATPROC in $(${PS} | ${GREP} /dev/input/event | ${GREP} -v grep | ${AWK} '{print $1}')
-  do
-    EXECL ${KILL} -9 ${CATPROC}
-  done
-
-  # Turn off blue-led.
-  echo "0" > ${LED_RED}
-  echo "0" > ${LED_GREEN}
-  echo "0" >  ${LED_BLUE}
-
-  ${HEXDUMP} ${WORKDIR}/keyevent* | ${GREP} -e '^.* 0001 .... .... ....$' > ${WORKDIR}/keycheck
-fi
-
-if [ -s ${WORKDIR}/keycheck -o -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
-  ECHOL "### recovery boot mode..."
-
-  EXECL ${RM} /cache/recovery/boot
-
-  # Recovery boot mode notification
-  echo "0" > ${LED_RED}
-  echo "255" > ${LED_GREEN}
-  echo "0" > ${LED_BLUE}
-  ${SLEEP} 1
-  echo "0" > ${LED_RED}
-  echo "0" > ${LED_GREEN}
-  echo "0" > ${LED_BLUE}
-
-  # Boot recovery
-  EXECL cd /
-  if [ -f /system/bin/ramdisk.tar ];then
+    # Boot ramdisk
+    EXECL cd /
+    if [ -f /system/bin/ramdisk.tar ];then
     ECHOL "### /system/bin/ramdisk.tar exist..."
 
     # Initialize system clock.
@@ -193,8 +132,6 @@ if [ -s ${WORKDIR}/keycheck -o -e /cache/recovery/boot -a -n "${BUSYBOX}" ];then
     # reboot when an error occurs in chroot
     reboot
   fi
-
-fi
 
 ECHOL "### normal boot mode..."
 
