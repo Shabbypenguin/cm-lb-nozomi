@@ -1,139 +1,28 @@
-# Constant definition
-LOGPATH="/cache/chargemon"
-LOGFILE="${LOGPATH}/chargemon.log"
-WORKDIR="${LOGPATH}"
-BTMGRPATH="/system/btmgr"
+#!/system/xbin/sh
+############# ############# #############
+# Chargemon script for Xperia S
+# Included:
+#     - Boot to CyanogenMod 10 with custom ramdisk
+# by atis112@xda, modified by me
+############# ############# #############
 
-# Environment variable definition
-PATH="/sbin:/system/xbin:/system/bin"; export PATH
+	############# ############# #############
+	# Boot to CyanogenMod with custom ramdisk
+	############# ############# #############
+	# remount rootfs rw
+	mount -o remount,rw rootfs /
 
-# Busybox setup
-if [ -x "${BTMGRPATH}/bin/busybox" ]; then
-  BUSYBOX="${BTMGRPATH}/bin/busybox"
-elif [ -x "/system/xbin/busybox" ]; then
-  BUSYBOX="/system/xbin/busybox"
-elif [ -x "/system/bin/busybox" ]; then
-  BUSYBOX="/system/bin/busybox"
-else
-  BUSYBOX=""
-fi
+	# Umount eMMCs
+	umount -l /dev/block/mmcblock0p12
+	umount -l /dev/block/mmcblock0p13
+	umount -l /dev/block/mmcblock0p14
+	umount -l /data
 
-# Command setup
-DATE="${BUSYBOX} date"
-MKDIR="${BUSYBOX} mkdir"
-CHOWN="${BUSYBOX} chown"
-CHMOD="${BUSYBOX} chmod"
-MV="${BUSYBOX} mv"
-TOUCH="${BUSYBOX} touch"
-CAT="${BUSYBOX} cat"
-SLEEP="${BUSYBOX} sleep"
-KILL="${BUSYBOX} kill"
-RM="${BUSYBOX} rm"
-PS="${BUSYBOX} ps"
-GREP="${BUSYBOX} grep"
-AWK="${BUSYBOX} awk"
-EXPR="${BUSYBOX} expr"
-MOUNT="${BUSYBOX} mount"
-UMOUNT="${BUSYBOX} umount"
-TAR="${BUSYBOX} tar"
-CHROOT="${BUSYBOX} chroot"
-LS="${BUSYBOX} ls"
-HEXDUMP="${BUSYBOX} hexdump"
+	# Mount ramdisk
+	cd /
+	rm -r /sbin /sdcard
+	rm -f etc init* uevent* default*
+	tar -xf /system/bin/ramdisk.tar
 
-# Function definition for logging
-ECHOL(){
-  _DATETIME=`${DATE} +"%Y%m%d %H%M%S"`
-  echo "${_DATETIME}: $*" >> ${LOGFILE}
-  return 0
-}
-EXECL(){
-  _DATETIME=`${DATE} +"%Y%m%d %H%M%S"`
-  echo "${_DATETIME}: $*" >> ${LOGFILE}
-  $* 2>> ${LOGFILE}
-  _RET=$?
-  echo "${_DATETIME}: RET=${_RET}" >> ${LOGFILE}
-  return ${_RET}
-}
-
-# Logfile rotation
-if [ ! -d "${LOGPATH}" ];then
-  ${MKDIR} ${LOGPATH}
-  ${CHOWN} system.cache ${LOGPATH}
-  ${CHMOD} 770 ${LOGPATH}
-else
-  if [ -f ${LOGFILE} ];then
-    ${MV} ${LOGFILE} ${LOGFILE}.old
-  fi
-  ${TOUCH} ${LOGFILE}
-  ${CHMOD} 660 ${LOGFILE}
-fi
-
-# Start main routine
-ECHOL "### chargemon start..."
-ECHOL "### BUSYBOX=${BUSYBOX}"
-
-# Make work directory
-ECHOL "### check workdir..."
-if [ ! -d "${WORKDIR}" ];then
-  EXECL ${MKDIR} ${WORKDIR}
-  EXECL ${CHOWN} system.cache ${WORKDIR}
-  EXECL ${CHMOD} 770 ${WORKDIR}
-fi
-
-    # Boot ramdisk
-    EXECL cd /
-    if [ -f /system/bin/ramdisk.tar ];then
-    ECHOL "### /system/bin/ramdisk.tar exist..."
-
-    # Initialize system clock.
-    ECHOL "### set timezone..."
-    EXECL export TZ="$(getprop persist.sys.timezone)"
-    ECHOL "### start time_daemon..."
-    /system/bin/time_daemon &
-    EXECL ${SLEEP} 5
-    ECHOL "### kill time_daemon..."
-    EXECL ${KILL} -9 $(${PS} | ${GREP} time_daemon | ${GREP} -v grep | ${AWK} -F' ' '{print $1}')
-
-    # Stop init services.
-    ECHOL "### stop init services..."
-    for SVCRUNNING in $(getprop | ${GREP} -E '^\[init\.svc\..*\]: \[running\]' | ${GREP} -v ueventd)
-    do
-      SVCNAME=$(${EXPR} ${SVCRUNNING} : '\[init\.svc\.\(.*\)\]:.*')
-      EXECL stop ${SVCNAME}
-    done
-    # Kill remaining processes under /system/bin
-    for RUNNINGPRC in $(${PS} | ${GREP} /system/bin | ${GREP} -v grep | ${GREP} -v chargemon | ${AWK} '{print $1}' )
-    do
-      EXECL ${KILL} -9 ${RUNNINGPRC}
-    done
-
-    # remount rootfs to rw.
-    ECHOL "### remount rootfs to rw..."
-    EXECL ${MOUNT} -o remount,rw rootfs /
-
-    # rm symlinks & files.
-    EXECL ${RM} sdcard etc tmp init* uevent* default*
-
-    # extract ramdisk.tar
-    EXECL ${RM} -r sbin
-    EXECL ${TAR} -xf /system/bin/ramdisk.tar
-
-    # setup tz.conf for init
-    ECHOL "### make tz.conf..."
-    EXECL echo on init > /tz.conf
-    EXECL echo export TZ "$(getprop persist.sys.timezone)" >> /tz.conf
-    EXECL ${CHMOD} 750 /tz.conf
-    EXECL tar cf /zoneinfo.tar /system/usr/share/zoneinfo
-
-    # chroot
-    ECHOL "### chroot..."
-    ${CHROOT} / /init
-
-    # reboot when an error occurs in chroot
-    reboot
-  fi
-
-ECHOL "### normal boot mode..."
-
-# Continue booting
-exec /system/bin/charger
+	# chroot
+	chroot / /init
