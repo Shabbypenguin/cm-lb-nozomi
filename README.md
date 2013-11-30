@@ -8,3 +8,14 @@ Credits:
 - artis112
 - DooMLorD
 - FreeXperia team
+
+boot.img
+bin/vold
+bin/sdcard
+bin/rild
+framework-res.apk/res/xml/storage_list.xml
+lib/hw
+lib/egl
+etc/vold.fstab
+usr/
+vendor/
