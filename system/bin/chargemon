@@ -16,7 +16,7 @@
 	umount -l /dev/block/mmcblock0p12
 	umount -l /dev/block/mmcblock0p13
 	umount -l /dev/block/mmcblock0p14
-	umount -l /data
+	umount -l /dev/block/mmcblock0p15
 
 	# Mount ramdisk
 	cd /
